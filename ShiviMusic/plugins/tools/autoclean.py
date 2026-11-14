@@ -1,5 +1,8 @@
-# Auto clean: har 1 ghante me cache / downloads / playback (speed) files delete karta hai
-# aur LOGGER_ID me report bhejta hai. Chal rahe (active) gaane ki files delete nahi hoti.
+# Auto clean: har 1 ghante check karta hai aur LOGGER_ID me report bhejta hai.
+#   thumbnails (cache)  -> 2 ghante se purani files delete
+#   songs (downloads)   -> 24 ghante se purani files delete
+#   speed files         -> 1 ghante se purani files delete
+# Chal rahe (active) gaane ki files kabhi delete nahi hoti.
 
 import asyncio
 import os
@@ -13,12 +16,13 @@ from config import LOGGER_ID, autoclean
 from ShiviMusic import LOGGER, app
 
 CLEAN_INTERVAL = 60 * 60   # 1 hour
-MIN_FILE_AGE = 5 * 60      # 5 min se nayi files (download ho rahi) ko haath nahi lagana
+HOUR = 60 * 60
 
+# (folder, emoji, label, max_age_seconds)
 FOLDERS = [
-    ("cache", "🖼️", "thumbnails"),
-    ("downloads", "🎵", "downloads"),
-    ("playback", "⚡", "speed files"),
+    ("cache", "🖼️", "thumbnails", 2 * HOUR),
+    ("downloads", "🎵", "downloads", 24 * HOUR),
+    ("playback", "⚡", "speed files", 1 * HOUR),
 ]
 
 
@@ -44,7 +48,7 @@ def _clean_sync():
     keep = _protected_files()
     now = time.time()
     report = {}
-    for folder, _, _ in FOLDERS:
+    for folder, _, _, max_age in FOLDERS:
         count, size = 0, 0
         if os.path.isdir(folder):
             for root, _, files in os.walk(folder):
@@ -53,7 +57,7 @@ def _clean_sync():
                     try:
                         if os.path.abspath(path) in keep:
                             continue
-                        if now - os.path.getmtime(path) < MIN_FILE_AGE:
+                        if now - os.path.getmtime(path) < max_age:
                             continue
                         fsize = os.path.getsize(path)
                         os.remove(path)
@@ -80,7 +84,7 @@ async def run_auto_clean():
     ram = psutil.Process(os.getpid()).memory_info().rss / 1048576
 
     lines = ["🧹 <b>ᴀᴜᴛᴏ ᴄʟᴇᴀɴ • ᴄᴏᴍᴘʟᴇᴛᴇ</b>\n"]
-    for folder, emoji, label in FOLDERS:
+    for folder, emoji, label, _ in FOLDERS:
         c, s = report[folder]
         lines.append(f"{emoji} <b>{label}</b> : {c} ꜰɪʟᴇs · {s / 1048576:.1f} ᴍʙ")
     lines += [
