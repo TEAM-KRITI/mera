@@ -13,7 +13,7 @@
 # -----------------------------------------------
 
 import random
-from datetime import datetime
+import time
 from pyrogram import filters
 from pyrogram.enums import ParseMode
 from pyrogram.types import Message
@@ -35,18 +35,28 @@ Shivi_PIC = [
     "https://d.uguu.se/aOQGWHbN.jpg"
 ]
 
+_PING_FILE_ID = None  # cached after first upload -> no re-download from uguu.se
+
+
 @app.on_message(filters.command(["ping", "alive"]) & ~BANNED_USERS)
 @language
 async def ping_com(client, message: Message, _):
-    start = datetime.now()
+    global _PING_FILE_ID
+    start = time.perf_counter()
     response = await message.reply_photo(
-        photo=random.choice(Shivi_PIC),
+        photo=_PING_FILE_ID or random.choice(Shivi_PIC),
         caption=_["ping_1"].format(app.mention),
         parse_mode=ParseMode.HTML,
     )
+    # real Telegram round-trip only (stats gathering is not counted)
+    resp = round((time.perf_counter() - start) * 1000, 2)
+    if not _PING_FILE_ID:
+        try:
+            _PING_FILE_ID = response.photo.file_id
+        except Exception:
+            pass
     pytgping = await Shivi.ping()
     UP, CPU, RAM, DISK = await bot_sys_stats()
-    resp = (datetime.now() - start).microseconds / 1000
     await response.edit_caption(
         _["ping_2"].format(resp, app.mention, UP, RAM, CPU, DISK, pytgping),
         parse_mode=ParseMode.HTML,
